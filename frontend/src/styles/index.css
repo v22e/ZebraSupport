@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --zebra-black: #0a0a0a;
+  --zebra-white: #f8f8f8;
+  --zebra-gray: #d8d8d8;
+  --zebra-accent: repeating-linear-gradient(
+    135deg,
+    #0a0a0a,
+    #0a0a0a 14px,
+    #f8f8f8 14px,
+    #f8f8f8 28px
+  );
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  background: radial-gradient(circle at top right, #ffffff 0%, #f2f2f2 32%, #e8e8e8 100%);
+  color: #101010;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.zebra-stripe-bar {
+  background: var(--zebra-accent);
+}
+
+.zebra-card {
+  @apply rounded-xl border border-black/20 bg-white shadow-zebra;
+}
