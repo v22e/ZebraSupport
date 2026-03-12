@@ -1,18 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { fetchTicketById, updateTicket } from "../../api/tickets";
 import StatusPill from "../../components/StatusPill";
+import { useAuth } from "../../context/AuthContext";
 
 const statusOptions = ["Open", "Escalated", "Closed", "Auto-Replied"];
 
 const TicketDetailPage = () => {
+  const { user } = useAuth();
   const { id } = useParams();
+  const location = useLocation();
   const [ticket, setTicket] = useState(null);
   const [manualReply, setManualReply] = useState("");
   const [status, setStatus] = useState("Open");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const allowedStatusOptions = useMemo(() => {
+    const base = statusOptions.filter((value) => value !== "Auto-Replied");
+
+    if (status && !base.includes(status)) {
+      return [status, ...base];
+    }
+
+    return base;
+  }, [status, user?.role]);
 
   useEffect(() => {
     const load = async () => {
@@ -30,6 +42,7 @@ const TicketDetailPage = () => {
   }, [id]);
 
   const canSave = useMemo(() => Boolean(ticket), [ticket]);
+  const backToTicketsPath = `/admin/tickets${location.state?.fromSearch || ""}`;
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -40,12 +53,17 @@ const TicketDetailPage = () => {
     setError("");
 
     try {
-      const payload = { status, isRead: true };
+      const payload = { isRead: true };
+      if (user?.role !== "user") {
+        payload.status = status;
+      }
       if (manualReply.trim()) {
         payload.manualReply = manualReply.trim();
       }
       const data = await updateTicket(id, payload);
       setTicket(data.ticket);
+      setStatus(data.ticket.status || status);
+      setManualReply("");
       setMessage("Ticket updated successfully.");
     } catch (err) {
       setError(err.message || "Failed to update ticket");
@@ -116,18 +134,24 @@ const TicketDetailPage = () => {
         />
 
         <div className="flex flex-wrap items-center gap-4">
-          <label className="text-sm font-semibold">Status</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-md border border-black/30 px-3 py-2"
-          >
-            {statusOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          {user?.role !== "user" ? (
+            <>
+              <label className="text-sm font-semibold">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="rounded-md border border-black/30 px-3 py-2"
+              >
+                {allowedStatusOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <p className="text-sm text-black/70">Users can reply to assigned tickets but cannot change status.</p>
+          )}
 
           <button
             type="submit"
@@ -137,7 +161,7 @@ const TicketDetailPage = () => {
             {saving ? "Saving..." : "Save changes"}
           </button>
 
-          <Link to="/admin/tickets" className="text-sm font-bold underline">
+          <Link to={backToTicketsPath} className="text-sm font-bold underline">
             Back to Tickets
           </Link>
         </div>
@@ -150,3 +174,4 @@ const TicketDetailPage = () => {
 };
 
 export default TicketDetailPage;
+

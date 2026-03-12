@@ -21,11 +21,12 @@ const createTicketSchema = z.object({
   body: z.object({
     subject: z.string().min(3),
     description: z.string().min(5),
-    requesterName: z.string().min(2),
-    requesterEmail: z.string().email(),
-    company: z.string().min(2),
+    requesterName: z.string().min(2).optional(),
+    requesterEmail: z.string().email().optional(),
+    company: z.string().min(2).optional(),
     priority: priorityEnum.optional(),
-    status: statusEnum.optional()
+    status: statusEnum.optional(),
+    assignedTo: z.number().int().positive().optional()
   }),
   params: z.object({}),
   query: z.object({})
@@ -39,7 +40,9 @@ const updateTicketSchema = z.object({
       status: statusEnum.optional(),
       priority: priorityEnum.optional(),
       manualReply: z.string().min(2).optional(),
-      isRead: z.boolean().optional()
+      message: z.string().min(2).optional(),
+      isRead: z.boolean().optional(),
+      assignedTo: z.number().int().positive().nullable().optional()
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided"
@@ -48,9 +51,18 @@ const updateTicketSchema = z.object({
   query: z.object({})
 });
 
+const assignTicketSchema = z.object({
+  body: z.object({
+    assignedTo: z.number().int().positive()
+  }),
+  params: z.object({ id: z.string().regex(/^\d+$/) }),
+  query: z.object({})
+});
+
 module.exports = {
   listTicketsSchema,
   ticketIdParamSchema,
   createTicketSchema,
-  updateTicketSchema
+  updateTicketSchema,
+  assignTicketSchema
 };

@@ -7,7 +7,7 @@ const StatusPill = ({ status }) => {
   };
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${statusStyles[status] || "bg-zebra-gray"}`}>
+    <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${statusStyles[status] || "bg-zebra-gray"}`}>
       {status}
     </span>
   );

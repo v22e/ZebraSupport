@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getHomeRouteByRole } from "../utils/roles";
 
 const LoginPage = () => {
   const [form, setForm] = useState({ email: "admin@zebrasupport.io", password: "Password123!" });
@@ -16,8 +17,9 @@ const LoginPage = () => {
     setError("");
 
     try {
-      await login(form);
-      navigate(location.state?.from || "/admin/dashboard", { replace: true });
+      const loggedInUser = await login(form);
+      const fallbackPath = getHomeRouteByRole(loggedInUser.role);
+      navigate(location.state?.from || fallbackPath, { replace: true });
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {

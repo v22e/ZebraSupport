@@ -6,7 +6,13 @@ module.exports = (error, _req, res, _next) => {
     console.error(error);
   }
 
-  return res.status(statusCode).json({
+  const payload = {
     error: message
-  });
+  };
+
+  if (error.details && typeof error.details === "object") {
+    Object.assign(payload, error.details);
+  }
+
+  return res.status(statusCode).json(payload);
 };

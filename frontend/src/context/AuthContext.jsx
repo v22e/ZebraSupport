@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }) => {
     () => ({
       user,
       loading,
+      refreshUser,
       async login(payload) {
         const data = await loginUser(payload);
         setUser(data.user);
@@ -37,8 +38,13 @@ export const AuthProvider = ({ children }) => {
         return data.user;
       },
       async logout() {
-        await logoutUser();
-        setUser(null);
+        try {
+          await logoutUser();
+        } catch (_error) {
+          // Session may already be invalidated by self-deactivation or expiry.
+        } finally {
+          setUser(null);
+        }
       }
     }),
     [user, loading]

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getHomeRouteByRole } from "../utils/roles";
 
 const RegisterPage = () => {
   const [form, setForm] = useState({
@@ -21,8 +22,8 @@ const RegisterPage = () => {
     setError("");
 
     try {
-      await register(form);
-      navigate("/admin/dashboard", { replace: true });
+      const createdUser = await register(form);
+      navigate(getHomeRouteByRole(createdUser.role), { replace: true });
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {

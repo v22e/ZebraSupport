@@ -2,6 +2,11 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+const parseBoolean = (value, fallback = false) => {
+  if (value === undefined) return fallback;
+  return String(value).toLowerCase() === "true";
+};
+
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 5000),
@@ -11,7 +16,9 @@ const env = {
   accessSecret: process.env.JWT_ACCESS_SECRET,
   refreshSecret: process.env.JWT_REFRESH_SECRET,
   accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
-  refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d"
+  refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+  demoMode: parseBoolean(process.env.DEMO_MODE, true),
+  demoOrgId: Number(process.env.DEMO_ORG_ID || 1)
 };
 
 const required = [

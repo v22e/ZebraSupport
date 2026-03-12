@@ -1,7 +1,8 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getHomeRouteByRole } from "../utils/roles";
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles, unauthRedirect = "/login" }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -14,7 +15,12 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to={unauthRedirect} replace state={{ from: location.pathname }} />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    const redirectPath = getHomeRouteByRole(user.role);
+    return <Navigate to={redirectPath} replace />;
   }
 
   return children;

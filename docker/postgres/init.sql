@@ -1,20 +1,64 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+DROP TABLE IF EXISTS notification_preferences;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS demo_requests;
 DROP TABLE IF EXISTS tickets;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS plan_limits;
+DROP TABLE IF EXISTS organisations;
+DROP TYPE IF EXISTS role_enum;
+DROP TYPE IF EXISTS organisation_status;
+DROP TYPE IF EXISTS plan_tier;
+DROP TYPE IF EXISTS demo_request_status;
+
+CREATE TYPE role_enum AS ENUM ('superadmin', 'org_owner', 'org_admin', 'user');
+CREATE TYPE organisation_status AS ENUM ('active', 'suspended');
+CREATE TYPE plan_tier AS ENUM ('free', 'plus', 'pro');
+CREATE TYPE demo_request_status AS ENUM ('new', 'contacted', 'converted', 'closed');
+
+CREATE TABLE organisations (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(180) NOT NULL,
+  plan plan_tier NOT NULL DEFAULT 'free',
+  plan_updated_at TIMESTAMPTZ,
+  status organisation_status NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE plan_limits (
+  plan VARCHAR PRIMARY KEY,
+  max_users INTEGER,
+  max_tickets INTEGER,
+  analytics VARCHAR,
+  csv_export BOOLEAN
+);
+
+INSERT INTO plan_limits (plan, max_users, max_tickets, analytics, csv_export)
+VALUES
+  ('free', 3, 50, 'basic', false),
+  ('plus', 10, 500, 'full', false),
+  ('pro', NULL, NULL, 'full', true);
 
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
+  org_id INTEGER REFERENCES organisations(id) ON DELETE CASCADE,
   name VARCHAR(120) NOT NULL,
-  company VARCHAR(180) NOT NULL,
   email VARCHAR(180) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
+  role role_enum NOT NULL DEFAULT 'user',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
   refresh_token TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (NOT (role = 'superadmin' AND org_id IS NOT NULL)),
+  CHECK (NOT (role <> 'superadmin' AND org_id IS NULL))
 );
 
 CREATE TABLE tickets (
   id SERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  submitted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
   subject VARCHAR(200) NOT NULL,
   description TEXT NOT NULL,
   requester_name VARCHAR(120) NOT NULL,
@@ -26,393 +70,153 @@ CREATE TABLE tickets (
   ai_reply TEXT,
   manual_reply TEXT,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  is_demo BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO users (name, company, email, password_hash)
-VALUES (
-  'Zara Bennett',
-  'ZebraSupport Demo Org',
-  'admin@zebrasupport.io',
-  crypt('Password123!', gen_salt('bf'))
+CREATE TABLE demo_requests (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  email VARCHAR NOT NULL,
+  company VARCHAR,
+  phone VARCHAR,
+  message TEXT,
+  interested_plan VARCHAR,
+  org_id INTEGER REFERENCES organisations(id) ON DELETE SET NULL,
+  status demo_request_status NOT NULL DEFAULT 'new',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  org_id INTEGER REFERENCES organisations(id) ON DELETE CASCADE,
+  type VARCHAR NOT NULL,
+  title VARCHAR NOT NULL,
+  body TEXT,
+  link VARCHAR,
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_org_id ON notifications(org_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+
+CREATE TABLE notification_preferences (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  type VARCHAR,
+  enabled BOOLEAN DEFAULT true,
+  PRIMARY KEY (user_id, type)
+);
+
+INSERT INTO organisations (id, name, plan, plan_updated_at, status)
+VALUES (1, 'ZebraSupport Demo Org', 'free', NOW(), 'active');
+
+INSERT INTO users (id, org_id, name, email, password_hash, role, active)
+VALUES
+  (1, NULL, 'Zebra Platform Admin', 'superadmin@zebrasupport.io', crypt('SuperAdmin123!', gen_salt('bf')), 'superadmin', TRUE),
+  (2, 1, 'Zara Bennett', 'admin@zebrasupport.io', crypt('Password123!', gen_salt('bf')), 'org_owner', TRUE),
+  (3, 1, 'Riley Stone', 'agent@zebrasupport.io', crypt('Password123!', gen_salt('bf')), 'user', TRUE),
+  (4, 1, 'Demo User', 'user@zebrasupport.io', crypt('Password123!', gen_salt('bf')), 'user', TRUE);
+
 INSERT INTO tickets (
-  subject, description, requester_name, requester_email, company, status, priority, topic, ai_reply, manual_reply, is_read, created_at, updated_at
-) VALUES
+  org_id,
+  submitted_by,
+  assigned_to,
+  subject,
+  description,
+  requester_name,
+  requester_email,
+  company,
+  status,
+  priority,
+  topic,
+  is_read,
+  is_demo,
+  created_at,
+  updated_at
+)
+VALUES
   (
-    'Password reset link never arrives',
-    'Our finance lead is not receiving reset links. Can you help?',
-    'Maya Patel',
-    'maya.patel@northbridge-ops.com',
-    'Northbridge Ops',
-    'Auto-Replied',
-    'Medium',
-    'Password Reset',
-    'Hi there, you can reset your password from the login page by clicking "Forgot Password". If the reset email does not arrive within 2 minutes, please check spam or ask your admin to whitelist support@zebrasupport.io.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '7 days 2 hours',
-    NOW() - INTERVAL '7 days 1 hour 55 minutes'
-  ),
-  (
-    'Invoice amount mismatch for February',
-    'The invoice appears to include 3 extra seats that were removed.',
-    'Leo Martinez',
-    'leo.martinez@crestlinebio.com',
-    'Crestline Bio',
-    'Escalated',
-    'High',
-    'Billing Query',
-    'Thanks for reaching out. Billing invoices are generated on the 1st of each month in your Billing tab. If you see a mismatch, reply with the invoice number and we will investigate immediately.',
-    'Escalated to finance operations for manual correction.',
-    FALSE,
-    NOW() - INTERVAL '6 days 8 hours',
-    NOW() - INTERVAL '6 days 6 hours'
-  ),
-  (
-    'Can not login after SSO update',
-    'Multiple team members are blocked after changing identity provider settings.',
-    'Priya Nair',
-    'priya.nair@vectorworks.ai',
-    'VectorWorks AI',
-    'Open',
-    'High',
-    'Account Access',
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '6 days 4 hours',
-    NOW() - INTERVAL '6 days 4 hours'
-  ),
-  (
-    'Webhook retries failing',
-    'Our webhook endpoint returns 500 on retries and some events are missing.',
-    'Ben Collins',
-    'ben.collins@atlasfintech.io',
-    'Atlas Fintech',
-    'Auto-Replied',
-    'Medium',
-    'API Integration',
-    'For API integration issues, verify your API key scope and webhook endpoint response codes. ZebraSupport expects a 2xx response for successful webhook delivery.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '5 days 9 hours',
-    NOW() - INTERVAL '5 days 8 hours 58 minutes'
-  ),
-  (
-    'Need urgent escalation policy advice',
-    'What is the best way to route urgent SLA tickets for enterprise customers?',
-    'Harper Nguyen',
-    'harper.nguyen@blueridgehealth.co',
-    'Blue Ridge Health',
-    'Auto-Replied',
-    'High',
-    'SLA & Priority',
-    'We detected an SLA or priority question. High-priority tickets are routed first; you can adjust priority rules under Admin Settings > Automation.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '5 days 5 hours',
-    NOW() - INTERVAL '5 days 4 hours 58 minutes'
-  ),
-  (
-    'Slow dashboard load for APAC region',
-    'Analytics dashboard takes over 12 seconds in Singapore offices.',
-    'Yuki Tan',
-    'yuki.tan@solariscommerce.com',
-    'Solaris Commerce',
-    'Open',
-    'Medium',
-    NULL,
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '4 days 18 hours',
-    NOW() - INTERVAL '4 days 18 hours'
-  ),
-  (
-    'Closed: Export CSV includes duplicate records',
-    'Issue was observed in version 2.4 and fixed after cache clear.',
-    'Omar Hassan',
-    'omar.hassan@windmarklogistics.com',
-    'Windmark Logistics',
-    'Closed',
-    'Low',
-    NULL,
-    NULL,
-    'Confirmed resolved with customer and closed.',
-    TRUE,
-    NOW() - INTERVAL '4 days 10 hours',
-    NOW() - INTERVAL '4 days 7 hours'
-  ),
-  (
-    'Password reset for contractor account',
-    'Temporary contractor no longer receives access code.',
-    'Nina Kline',
-    'nina.kline@novaviewmedia.com',
-    'NovaView Media',
-    'Auto-Replied',
-    'Low',
-    'Password Reset',
-    'Hi there, you can reset your password from the login page by clicking "Forgot Password". If the reset email does not arrive within 2 minutes, please check spam or ask your admin to whitelist support@zebrasupport.io.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '4 days 1 hour',
-    NOW() - INTERVAL '4 days 58 minutes'
-  ),
-  (
-    'Need prorated billing explanation',
-    'Can you explain prorated billing when we add seats mid-cycle?',
-    'Carlos Diaz',
-    'carlos.diaz@peakstonelegal.com',
-    'Peakstone Legal',
-    'Auto-Replied',
-    'Medium',
-    'Billing Query',
-    'Thanks for reaching out. Billing invoices are generated on the 1st of each month in your Billing tab. If you see a mismatch, reply with the invoice number and we will investigate immediately.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '3 days 20 hours',
-    NOW() - INTERVAL '3 days 19 hours 57 minutes'
-  ),
-  (
-    'Support inbox is empty after migration',
-    'After migrating workspace, old ticket history is not visible.',
-    'Grace Kim',
-    'grace.kim@lumen-industrial.com',
-    'Lumen Industrial',
-    'Escalated',
-    'High',
-    NULL,
-    NULL,
-    'Migration team engaged to restore historical messages.',
-    FALSE,
-    NOW() - INTERVAL '3 days 16 hours',
-    NOW() - INTERVAL '3 days 14 hours'
-  ),
-  (
-    'API key scope question',
-    'Is there a read-only token for external reporting tools?',
-    'Sofia Brooks',
-    'sofia.brooks@everfieldenergy.com',
-    'EverField Energy',
-    'Auto-Replied',
-    'Low',
-    'API Integration',
-    'For API integration issues, verify your API key scope and webhook endpoint response codes. ZebraSupport expects a 2xx response for successful webhook delivery.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '3 days 8 hours',
-    NOW() - INTERVAL '3 days 7 hours 56 minutes'
-  ),
-  (
-    'Closed: account access restored',
-    'User was removed from workspace accidentally and re-invited.',
-    'Quinn Harper',
-    'quinn.harper@arcmedsystems.com',
-    'ArcMed Systems',
-    'Closed',
-    'Medium',
-    'Account Access',
-    'It looks like an account access request. Please confirm your workspace name and user email. In many cases, re-inviting the user from Settings > Team resolves this issue right away.',
-    'User confirmed access is restored; closing ticket.',
-    TRUE,
-    NOW() - INTERVAL '3 days 3 hours',
-    NOW() - INTERVAL '3 days 2 hours'
-  ),
-  (
-    'Unread: high priority outage alert',
-    'The widget is down for all EMEA users.',
-    'Ethan Price',
-    'ethan.price@meridianfleet.com',
-    'Meridian Fleet',
-    'Open',
-    'High',
-    NULL,
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '2 days 23 hours',
-    NOW() - INTERVAL '2 days 23 hours'
-  ),
-  (
-    'Escalate bulk user import failure',
-    'CSV import stalls at 60% for 10k users.',
-    'Amelia Ross',
-    'amelia.ross@hollowayretail.com',
-    'Holloway Retail',
-    'Escalated',
-    'High',
-    NULL,
-    NULL,
-    'Sent to platform engineering for investigation.',
-    FALSE,
-    NOW() - INTERVAL '2 days 15 hours',
-    NOW() - INTERVAL '2 days 12 hours'
-  ),
-  (
-    'How to prioritize VIP customer queues?',
-    'Need best practice for priority scoring with VIP segments.',
-    'Theo Mitchell',
-    'theo.mitchell@copperleafbank.com',
-    'Copperleaf Bank',
-    'Auto-Replied',
-    'Medium',
-    'SLA & Priority',
-    'We detected an SLA or priority question. High-priority tickets are routed first; you can adjust priority rules under Admin Settings > Automation.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '2 days 9 hours',
-    NOW() - INTERVAL '2 days 8 hours 57 minutes'
-  ),
-  (
-    'Need account unlock for legal team',
-    'Three legal reviewers are locked out after MFA reset.',
-    'Liam Turner',
-    'liam.turner@oakridgepartners.com',
-    'Oakridge Partners',
-    'Open',
-    'High',
-    'Account Access',
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '2 days 5 hours',
-    NOW() - INTERVAL '2 days 5 hours'
-  ),
-  (
-    'Closed: updated billing contact',
-    'Please change billing contact to new procurement lead.',
-    'Chloe Ward',
-    'chloe.ward@primexmanufacturing.com',
-    'PrimeX Manufacturing',
-    'Closed',
-    'Low',
-    'Billing Query',
-    'Thanks for reaching out. Billing invoices are generated on the 1st of each month in your Billing tab. If you see a mismatch, reply with the invoice number and we will investigate immediately.',
-    'Billing contact updated and verified.',
-    TRUE,
-    NOW() - INTERVAL '2 days 2 hours',
-    NOW() - INTERVAL '2 days 1 hour'
-  ),
-  (
-    'Unread webhook signature mismatch',
-    'Webhook signatures fail verification in staging.',
-    'Noah Rivera',
-    'noah.rivera@silverpinehotels.com',
-    'Silverpine Hotels',
-    'Open',
-    'Medium',
-    'API Integration',
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '1 day 20 hours',
-    NOW() - INTERVAL '1 day 20 hours'
-  ),
-  (
-    'Auto response for password issue',
-    'Employee accidentally changed password twice and is blocked.',
-    'Ava Johnson',
-    'ava.johnson@brookfieldinsure.com',
-    'Brookfield Insure',
-    'Auto-Replied',
-    'Medium',
-    'Password Reset',
-    'Hi there, you can reset your password from the login page by clicking "Forgot Password". If the reset email does not arrive within 2 minutes, please check spam or ask your admin to whitelist support@zebrasupport.io.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '1 day 15 hours',
-    NOW() - INTERVAL '1 day 14 hours 57 minutes'
-  ),
-  (
-    'Unread: analytics card totals inconsistent',
-    'Totals on dashboard and exports differ by about 4%.',
-    'Mason Reed',
-    'mason.reed@redclifftelecom.com',
-    'Redcliff Telecom',
-    'Open',
-    'Medium',
-    NULL,
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '1 day 9 hours',
-    NOW() - INTERVAL '1 day 9 hours'
-  ),
-  (
-    'Closed: SLA workflow confirmation',
-    'Need confirmation that SLA automation was enabled correctly.',
-    'Ella Brooks',
-    'ella.brooks@skybridgeventures.io',
-    'Skybridge Ventures',
-    'Closed',
-    'Low',
-    'SLA & Priority',
-    'We detected an SLA or priority question. High-priority tickets are routed first; you can adjust priority rules under Admin Settings > Automation.',
-    'Confirmed workflow is live in production.',
-    TRUE,
-    NOW() - INTERVAL '1 day 5 hours',
-    NOW() - INTERVAL '1 day 3 hours'
-  ),
-  (
-    'Open: team member cannot receive invite',
-    'Invite emails bounce for one partner domain.',
-    'Lucas Green',
-    'lucas.green@vanguardagri.co',
-    'Vanguard Agri',
+    1,
+    4,
+    3,
+    'Cannot log into my account',
+    'I am unable to log in with my registered credentials. Please help me restore access.',
+    'Demo User',
+    'user@zebrasupport.io',
+    'ZebraSupport Demo Org',
     'Open',
     'Medium',
     'Account Access',
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '18 hours',
-    NOW() - INTERVAL '18 hours'
+    false,
+    false,
+    NOW() - INTERVAL '3 days',
+    NOW() - INTERVAL '3 days'
   ),
   (
-    'Auto-replied billing VAT question',
-    'How should VAT be displayed on EU invoices?',
-    'Mila Carter',
-    'mila.carter@clearwatermed.com',
-    'Clearwater Medical',
-    'Auto-Replied',
+    1,
+    4,
+    3,
+    'Invoice not received for March',
+    'I have not received the March invoice yet. Could you resend it to my billing email?',
+    'Demo User',
+    'user@zebrasupport.io',
+    'ZebraSupport Demo Org',
+    'Closed',
     'Low',
     'Billing Query',
-    'Thanks for reaching out. Billing invoices are generated on the 1st of each month in your Billing tab. If you see a mismatch, reply with the invoice number and we will investigate immediately.',
-    NULL,
-    TRUE,
-    NOW() - INTERVAL '12 hours',
-    NOW() - INTERVAL '11 hours 57 minutes'
+    true,
+    false,
+    NOW() - INTERVAL '9 days',
+    NOW() - INTERVAL '8 days'
   ),
   (
-    'Escalated: mobile app crashes on thread view',
-    'Android app crashes when opening long ticket conversations.',
-    'James Cook',
-    'james.cook@fusionfreight.io',
-    'Fusion Freight',
+    1,
+    4,
+    3,
+    'App crashes on mobile browser',
+    'The app crashes whenever I open the ticket list on mobile Safari.',
+    'Demo User',
+    'user@zebrasupport.io',
+    'ZebraSupport Demo Org',
     'Escalated',
     'High',
     NULL,
-    NULL,
-    'Escalated to mobile engineering team.',
-    FALSE,
-    NOW() - INTERVAL '8 hours',
-    NOW() - INTERVAL '6 hours'
-  ),
-  (
-    'Open: can we bulk-close resolved tickets?',
-    'Looking for bulk action tools to close stale tickets.',
-    'Aria Shah',
-    'aria.shah@newharborcapital.com',
-    'New Harbor Capital',
-    'Open',
-    'Low',
-    NULL,
-    NULL,
-    NULL,
-    FALSE,
-    NOW() - INTERVAL '4 hours',
-    NOW() - INTERVAL '4 hours'
+    false,
+    false,
+    NOW() - INTERVAL '1 day',
+    NOW() - INTERVAL '20 hours'
   );
+
+INSERT INTO notification_preferences (user_id, type, enabled)
+SELECT
+  u.id,
+  t.type,
+  true
+FROM users u
+CROSS JOIN (
+  VALUES
+    ('ticket_created'),
+    ('ticket_replied'),
+    ('ticket_escalated'),
+    ('ticket_closed'),
+    ('ticket_assigned'),
+    ('ticket_auto_replied'),
+    ('user_invited'),
+    ('user_role_changed'),
+    ('user_deactivated'),
+    ('plan_limit_warning'),
+    ('plan_limit_reached'),
+    ('demo_request_received'),
+    ('org_suspended'),
+    ('new_org_registered')
+) AS t(type);
+
+SELECT setval('organisations_id_seq', COALESCE((SELECT MAX(id) FROM organisations), 1), true);
+SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 1), true);
+SELECT setval('tickets_id_seq', COALESCE((SELECT MAX(id) FROM tickets), 1), true);
+SELECT setval('demo_requests_id_seq', COALESCE((SELECT MAX(id) FROM demo_requests), 1), true);
+SELECT setval('notifications_id_seq', COALESCE((SELECT MAX(id) FROM notifications), 1), true);

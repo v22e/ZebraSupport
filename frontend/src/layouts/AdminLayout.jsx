@@ -1,16 +1,31 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+﻿import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import NotificationBell from "../components/NotificationBell";
+import PlanBadge from "../components/PlanBadge";
 import { useAuth } from "../context/AuthContext";
+import { formatRole } from "../utils/roles";
 
-const navItems = [
-  { to: "/admin/dashboard", label: "Dashboard" },
-  { to: "/admin/tickets", label: "Tickets" },
-  { to: "/admin/analytics", label: "Analytics" },
-  { to: "/admin/settings", label: "Settings" }
-];
+const navItemsByRole = {
+  org_owner: [
+    { to: "/admin/dashboard", label: "Dashboard" },
+    { to: "/admin/tickets", label: "Tickets" },
+    { to: "/admin/analytics", label: "Analytics" },
+    { to: "/admin/notifications", label: "Notifications" },
+    { to: "/admin/billing", label: "Billing" },
+    { to: "/admin/settings", label: "Settings" }
+  ],
+  org_admin: [
+    { to: "/admin/dashboard", label: "Dashboard" },
+    { to: "/admin/tickets", label: "Tickets" },
+    { to: "/admin/analytics", label: "Analytics" },
+    { to: "/admin/notifications", label: "Notifications" },
+    { to: "/admin/settings", label: "Settings" }
+  ]
+};
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const navItems = navItemsByRole[user?.role] || navItemsByRole.org_admin;
 
   const handleLogout = async () => {
     await logout();
@@ -30,9 +45,13 @@ const AdminLayout = () => {
           </Link>
 
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-bold">{user?.name}</p>
-              <p className="text-xs text-black/60">{user?.company}</p>
+              <p className="text-xs text-black/60">
+                {user?.company} · {formatRole(user?.role)}
+              </p>
+              <PlanBadge plan={user?.plan} className="mt-1" />
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-full border border-black bg-zebra-gray font-bold">
               {user?.name?.[0] || "U"}
@@ -76,3 +95,5 @@ const AdminLayout = () => {
 };
 
 export default AdminLayout;
+
+
