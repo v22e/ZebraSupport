@@ -1,0 +1,96 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --zebra-black: #0a0a0a;
+  --zebra-white: #f8f8f8;
+  --zebra-gray: #d8d8d8;
+  --zebra-accent: repeating-linear-gradient(
+    135deg,
+    #0a0a0a,
+    #0a0a0a 14px,
+    #f8f8f8 14px,
+    #f8f8f8 28px
+  );
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  background: radial-gradient(circle at top right, #ffffff 0%, #f2f2f2 32%, #e8e8e8 100%);
+  color: #101010;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.zebra-stripe-bar {
+  background: var(--zebra-accent);
+}
+
+.zebra-card {
+  @apply rounded-xl border border-black/20 bg-white shadow-zebra;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up 260ms ease-out both;
+}
+
+@keyframes typing-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typing-dot {
+  height: 7px;
+  width: 7px;
+  border-radius: 999px;
+  background: #0a0a0a;
+  animation: typing-bounce 900ms infinite ease-in-out;
+}
+
+.typing-dot-1 {
+  animation-delay: 0ms;
+}
+
+.typing-dot-2 {
+  animation-delay: 150ms;
+}
+
+.typing-dot-3 {
+  animation-delay: 300ms;
+}

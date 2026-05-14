@@ -1,0 +1,1 @@
+export const DEMO_MODE = String(import.meta.env.VITE_DEMO_MODE || "true").toLowerCase() === "true";

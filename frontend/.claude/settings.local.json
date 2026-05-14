@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(cmd /c \"netstat -ano | findstr \\\\\":5000 :3000\\\\\"\")",
+      "Bash(cmd /c \"netstat -ano | findstr LISTEN\")",
+      "Bash(curl -s http://localhost:5000/health)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(cmd /c \"netstat -ano\")",
+      "Bash(curl -sv http://localhost:5000/health)",
+      "Bash(node -e \"const env = require\\('./src/config/env'\\); console.log\\('env loaded ok:', JSON.stringify\\({port: env.port, cors: env.corsOrigin, db: env.databaseUrl ? 'set' : 'missing'}\\)\\)\")",
+      "Bash(PGPASSWORD=postgres psql *)",
+      "Bash(docker exec zebrasupport-postgres *)"
+    ]
+  }
+}

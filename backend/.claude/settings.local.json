@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/leobe/Downloads/ZebraSupport-main/ZebraSupport-main//**)",
+      "Read(//c/Users/leobe/Downloads/ZebraSupport-main/ZebraSupport-main/**)"
+    ]
+  }
+}
