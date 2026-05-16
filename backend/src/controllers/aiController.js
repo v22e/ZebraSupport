@@ -114,4 +114,65 @@ const chat = asyncHandler(async (req, res) => {
   res.json({ reply: result.response.text() });
 });
 
-module.exports = { chat };
+const classifyCopilotKind = (mode, message = "") => {
+  if (mode === "customer_reply" || /\b(draft|write|reply|respond|ask customer|customer-facing)\b/i.test(message)) {
+    return "customer_draft";
+  }
+
+  return "internal_guidance";
+};
+
+const ticketCopilot = asyncHandler(async (req, res) => {
+  const { ticketId, messages, mode = "internal" } = req.body;
+
+  if (!ticketId) {
+    throw new ApiError(400, "ticketId is required");
+  }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new ApiError(400, "messages array is required");
+  }
+
+  const ticket = await getTicketByIdForUser({ ticketId, user: req.user });
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  if (!lastMessage?.content || typeof lastMessage.content !== "string") {
+    throw new ApiError(400, "last message content is required");
+  }
+
+  const kind = classifyCopilotKind(mode, lastMessage.content);
+  const isCustomerDraft = kind === "customer_draft";
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    systemInstruction: `You are Ticket Copilot for ZebraSupport agents handling support tickets.
+Use only the provided ticket context and the chat conversation.
+${formatTicketContext("Ticket context:", ticket)}
+
+If producing internal guidance, be direct, practical, and structured for a support agent.
+If producing a customer draft, write only the customer-facing response. Do not include labels, analysis, markdown headings, internal notes, or mention being an AI.
+Keep answers concise and action-oriented.`
+  });
+
+  const history = messages.slice(0, -1).map((m) => ({
+    role: normalizeRole(m.role),
+    parts: [{ text: m.content }]
+  }));
+
+  const prompt = isCustomerDraft
+    ? `${lastMessage.content}\n\nReturn a polished customer-facing reply that can be pasted directly into the manual reply box.`
+    : lastMessage.content;
+
+  const chatSession = model.startChat({ history });
+  const result = await chatSession.sendMessage(prompt);
+  const reply = result.response.text().trim();
+
+  res.json({
+    reply,
+    kind,
+    canApplyToReply: isCustomerDraft
+  });
+});
+
+module.exports = { chat, ticketCopilot };
