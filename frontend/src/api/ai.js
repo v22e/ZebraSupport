@@ -1,7 +1,7 @@
 import { apiRequest } from "./client";
 
-export const sendChatMessage = (messages) =>
+export const sendChatMessage = (messages, context) =>
   apiRequest("/api/ai/chat", {
     method: "POST",
-    body: JSON.stringify({ messages })
+    body: JSON.stringify({ messages, context })
   });

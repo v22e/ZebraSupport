@@ -1,15 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { matchPath, useLocation } from "react-router-dom";
 import { MessageCircle, Send, X } from "lucide-react";
 import { sendChatMessage } from "../api/ai";
 
+const initialMessages = [
+  { role: "model", content: "Hi! I'm the ZebraSupport assistant. Ask me anything about the platform or your tickets." }
+];
+
+const quickActions = [
+  { label: "Summarize", prompt: "Summarize this ticket and highlight the customer's main problem." },
+  { label: "Draft reply", prompt: "Draft a concise, professional reply for this ticket." },
+  { label: "Next steps", prompt: "Suggest the best next steps for handling this ticket." }
+];
+
 const AIChatWidget = () => {
+  const location = useLocation();
+  const ticketMatch = matchPath("/admin/tickets/:id", location.pathname);
+  const chatContext = useMemo(() => {
+    if (ticketMatch?.params?.id) {
+      return { page: "ticket-detail", ticketId: Number(ticketMatch.params.id) };
+    }
+
+    return { page: location.pathname };
+  }, [location.pathname, ticketMatch?.params?.id]);
+
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: "model", content: "Hi! I'm the ZebraSupport assistant. Ask me anything about the platform." }
-  ]);
+  const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
+  const isTicketPage = Boolean(chatContext.ticketId);
 
   useEffect(() => {
     if (open) {
@@ -17,18 +37,19 @@ const AIChatWidget = () => {
     }
   }, [messages, open]);
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (overrideText) => {
+    const text = (overrideText ?? input).trim();
     if (!text || loading) return;
 
     const updated = [...messages, { role: "user", content: text }];
     setMessages(updated);
     setInput("");
     setLoading(true);
+    setOpen(true);
 
     try {
       const apiMessages = updated.filter((m, i) => !(i === 0 && m.role === "model"));
-      const data = await sendChatMessage(apiMessages);
+      const data = await sendChatMessage(apiMessages, chatContext);
       setMessages((prev) => [...prev, { role: "model", content: data.reply }]);
     } catch {
       setMessages((prev) => [
@@ -54,12 +75,30 @@ const AIChatWidget = () => {
           <div className="flex items-center justify-between rounded-t-2xl border-b border-black/10 bg-black px-4 py-3">
             <div>
               <p className="text-sm font-bold text-white">ZebraSupport Assistant</p>
-              <p className="text-xs text-white/60">Ask me anything about the platform</p>
+              <p className="text-xs text-white/60">
+                {isTicketPage ? `Using ticket #${chatContext.ticketId} context` : "Ask about the platform or latest tickets"}
+              </p>
             </div>
             <button type="button" onClick={() => setOpen(false)} className="text-white/70 hover:text-white">
               <X size={18} />
             </button>
           </div>
+
+          {isTicketPage ? (
+            <div className="flex flex-wrap gap-2 border-b border-black/10 p-3">
+              {quickActions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => send(action.prompt)}
+                  disabled={loading}
+                  className="rounded-full border border-black/20 px-3 py-1 text-xs font-bold transition hover:border-black hover:bg-zebra-gray disabled:opacity-50"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="space-y-3 overflow-y-auto p-4" style={{ maxHeight: "360px" }}>
             {messages.map((m, i) => (
@@ -87,12 +126,12 @@ const AIChatWidget = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question..."
+              placeholder={isTicketPage ? "Ask about this ticket..." : "Ask a question..."}
               className="flex-1 rounded-md border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"
             />
             <button
               type="button"
-              onClick={send}
+              onClick={() => send()}
               disabled={!input.trim() || loading}
               className="rounded-md border border-black bg-black p-2 text-white transition hover:bg-white hover:text-black disabled:opacity-40"
             >
