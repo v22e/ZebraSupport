@@ -1,4 +1,5 @@
 ﻿import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import AIChatWidget from "../components/AIChatWidget";
 import NotificationBell from "../components/NotificationBell";
 import PlanBadge from "../components/PlanBadge";
 import { useAuth } from "../context/AuthContext";
@@ -90,6 +91,7 @@ const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+      <AIChatWidget />
     </div>
   );
 };

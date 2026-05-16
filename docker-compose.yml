@@ -49,6 +49,7 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-superadmin@zebrasupport.io}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-SuperAdmin123!}
     depends_on:
