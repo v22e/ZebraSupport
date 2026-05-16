@@ -12,7 +12,7 @@ const chat = asyncHandler(async (req, res) => {
   }
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     systemInstruction:
       "You are a helpful support assistant for ZebraSupport, a B2B AI-powered customer support ticket platform. Help users with questions about using the platform: managing tickets, understanding analytics, inviting team members, adjusting notification settings, CSV exports, subscription plans, and general IT support questions. Be concise, friendly, and practical. Do not mention being an AI unless directly asked."
   });
